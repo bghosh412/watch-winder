@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Fish Feeder</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      fetch('/api/home')
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('connectionStatus').textContent = data.connectionStatus || 'Offline';
+          document.getElementById('feedRemaining').textContent = data.feedRemaining || 'N/A';
+          if (data.lastFed) {
+            const dt = new Date(data.lastFed);
+            const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            document.getElementById('lastFed').textContent = 'Last fed on ' + dt.toLocaleString(undefined, options);
+          } else {
+            document.getElementById('lastFed').textContent = 'Last fed time unavailable';
+          }
+          document.getElementById('batteryStatus').textContent = data.batteryStatus || 'N/A';
+          document.getElementById('nextFeed').textContent = data.nextFeed || 'Not scheduled';
+        })
+        .catch(() => {
+          document.getElementById('connectionStatus').textContent = 'Offline';
+          document.getElementById('feedRemaining').textContent = 'N/A';
+          document.getElementById('lastFed').textContent = 'Last fed time unavailable';
+          document.getElementById('batteryStatus').textContent = 'N/A';
+          document.getElementById('nextFeed').textContent = 'Not scheduled';
+        });
+    });
+  </script>
+  <div class="header">
+    <div class="header-content">
+      <div class="header-logo">
+        <img src="assets/images/Header.png" alt="Fish Feeder Logo">
+      </div>
+      <div class="header-title">
+        <h1>Keep your Fish full</h1>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;">
+    <div class="sidebar">
+  <b>Quick Links</b><br>
+  <a href="index.html" class="quick-link">Home</a>
+  <a href="setschedule.html" class="quick-link">Set Feeding Schedule</a>
+  <a href="feednow.html" class="quick-link">Feed Now !!!</a>
+  <a href="setquantity.html" class="quick-link">Set Quantity</a>
+  <a href="calibration.html" class="quick-link">Calibration</a>
+  <a href="troubleshooting.html" class="quick-link">Troubleshooting</a>
+  
+    </div>
+    <div style="flex:1; padding:8px;">
+      <div class="info-card"><b>Feed Remaining:</b> <span id="feedRemaining">6 more feed remaining</span></div>
+      <div class="info-card"><b>Last Fed:</b> <span id="lastFed">Last fed on Nov 9, 9:00 pm</span></div>
+      <div class="info-card"><b>Battery Status:</b> <span id="batteryStatus">40% of the Battery remaining</span></div>
+      <div class="card"><b>System Information:</b><br>
+        Connection: <span id="connectionStatus">Loading...</span><br>
+        Next Feed: <span id="nextFeed">Not scheduled</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
