@@ -1,4 +1,4 @@
-# Event logging service for fish feeder
+# Event logging service for watch winder
 # Stores critical events in a rotating log file (max 100 entries)
 
 import utime as time
@@ -7,9 +7,9 @@ LOG_FILE = 'data/events.log'
 MAX_ENTRIES = 100
 
 # Event types
-EVENT_FEED_SCHEDULED = 'FEED_SCHEDULED'
-EVENT_FEED_MANUAL = 'FEED_MANUAL'
-EVENT_FEED_IMMEDIATE = 'FEED_IMMEDIATE'
+EVENT_WIND_SCHEDULED = 'WIND_SCHEDULED'
+EVENT_WIND_MANUAL = 'WIND_MANUAL'
+EVENT_WIND_IMMEDIATE = 'WIND_IMMEDIATE'
 EVENT_ERROR = 'ERROR'
 EVENT_RESTART = 'RESTART'
 EVENT_CONFIG_CHANGE = 'CONFIG_CHANGE'

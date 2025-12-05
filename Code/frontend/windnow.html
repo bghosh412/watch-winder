@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Wind Now - Watch Winder</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <script>
+    function windNow() {
+      const duration = parseInt(document.getElementById('duration').value);
+      
+      if (!confirm(`Wind watch for ${duration} minutes?`)) {
+        return;
+      }
+      
+      const statusEl = document.getElementById('status');
+      statusEl.textContent = 'Winding...';
+      statusEl.style.color = 'blue';
+      
+      fetch('/api/windnow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duration: duration })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === 'ok') {
+            statusEl.textContent = 'Winding completed successfully!';
+            statusEl.style.color = 'green';
+            setTimeout(() => {
+              statusEl.textContent = '';
+            }, 3000);
+          } else {
+            statusEl.textContent = 'Error: ' + (data.message || data.error || 'Unknown error');
+            statusEl.style.color = 'red';
+          }
+        })
+        .catch(err => {
+          statusEl.textContent = 'Error: ' + err.message;
+          statusEl.style.color = 'red';
+        });
+    }
+  </script>
+  <div class="header">
+    <div class="header-content">
+      <div class="header-logo">
+        <img src="assets/images/Home.png" alt="Watch Winder Logo">
+      </div>
+      <div class="header-title">
+        <h1>Wind Now</h1>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;">
+    <div class="sidebar">
+      <b>Quick Links</b><br>
+      <a href="index.html" class="quick-link">Home</a>
+      <a href="setschedule.html" class="quick-link">Set Winding Schedule</a>
+      <a href="windnow.html" class="quick-link">Wind Now</a>
+      <a href="setquantity.html" class="quick-link">Set Wind Count</a>
+      <a href="calibration.html" class="quick-link">Calibration</a>
+      <a href="troubleshooting.html" class="quick-link">Troubleshooting</a>
+    </div>
+    <div style="flex:1; padding:20px;">
+      <div class="card">
+        <h2>Manual Watch Winding</h2>
+        <p style="margin-bottom:20px;">Wind your watch manually with custom duration.</p>
+        
+        <div style="margin-bottom:20px;">
+          <label style="display:block; margin-bottom:5px;"><b>Winding Duration (minutes):</b></label>
+          <select id="duration" style="padding:8px; width:200px; font-size:14px;">
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30" selected>30 minutes</option>
+            <option value="45">45 minutes</option>
+            <option value="60">60 minutes</option>
+            <option value="90">90 minutes</option>
+            <option value="120">120 minutes</option>
+          </select>
+        </div>
+
+        <button onclick="windNow()" style="padding:15px 40px; font-size:18px; background-color:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+          Wind Now
+        </button>
+        
+        <div id="status" style="margin-top:20px; font-size:16px; font-weight:bold;"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

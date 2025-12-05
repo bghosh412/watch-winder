@@ -6,8 +6,8 @@ WIFI_SSID = "your_wifi_ssid"
 WIFI_PASSWORD = "your_wifi_password"
 
 # mDNS/Hostname Configuration
-MDNS_HOSTNAME = "feeder"  # Access via http://feeder.local:5000
-MDNS_SERVICE_NAME = "Fish Feeder Device"
+MDNS_HOSTNAME = "winder"  # Access via http://feeder.local:5000
+MDNS_SERVICE_NAME = "Keep your watch running"
 
 # Feeding Schedule (24-hour format)
 FEEDING_TIMES = [
@@ -43,7 +43,7 @@ RTC_SCL_PIN = 5   # D1
 DEEP_SLEEP_MINUTES = 30  # Wake up every 30 minutes to check schedule
 
 # Notification Configuration (ntfy)
-NTFY_TOPIC = "FF0x98854"
+NTFY_TOPIC = "WW0x98854"
 NTFY_SERVER = "http://ntfy.sh"
 SEND_NOTIFICATIONS = True
 

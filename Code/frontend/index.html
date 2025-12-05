@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Watch Winder</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      fetch('/api/home')
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('connectionStatus').textContent = data.connectionStatus || 'Offline';
+          document.getElementById('windRemaining').textContent = data.windRemaining || 'N/A';
+          if (data.lastWinding) {
+            const dt = new Date(data.lastWinding);
+            const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            document.getElementById('lastWinding').textContent = 'Last wound on ' + dt.toLocaleString(undefined, options);
+          } else {
+            document.getElementById('lastWinding').textContent = 'Last winding time unavailable';
+          }
+          document.getElementById('batteryStatus').textContent = data.batteryStatus || 'N/A';
+          document.getElementById('nextWinding').textContent = data.nextWinding || 'Not scheduled';
+        })
+        .catch(() => {
+          document.getElementById('connectionStatus').textContent = 'Offline';
+          document.getElementById('windRemaining').textContent = 'N/A';
+          document.getElementById('lastWinding').textContent = 'Last winding time unavailable';
+          document.getElementById('batteryStatus').textContent = 'N/A';
+          document.getElementById('nextWinding').textContent = 'Not scheduled';
+        });
+    });
+  </script>
+  <div class="header">
+    <div class="header-content">
+      <div class="header-logo">
+        <img src="assets/images/Home.png" alt="Watch Winder Logo">
+      </div>
+      <div class="header-title">
+        <h1>Keep your Watch on Time</h1>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;">
+    <div class="sidebar">
+      <b>Quick Links</b><br>
+      <a href="index.html" class="quick-link">Home</a>
+      <a href="setschedule.html" class="quick-link">Set Winding Schedule</a>
+      <a href="windnow.html" class="quick-link">Wind Now</a>
+      <a href="setquantity.html" class="quick-link">Set Wind Count</a>
+      <a href="calibration.html" class="quick-link">Calibration</a>
+      <a href="troubleshooting.html" class="quick-link">Troubleshooting</a>
+    </div>
+    <div style="flex:1; padding:8px;">
+      <div class="info-card"><b>Winds Remaining:</b> <span id="windRemaining">6 more winds remaining</span></div>
+      <div class="info-card"><b>Last Winding:</b> <span id="lastWinding">Last wound on Nov 9, 9:00 pm</span></div>
+      <div class="info-card"><b>Battery Status:</b> <span id="batteryStatus">40% of the Battery remaining</span></div>
+      <div class="card"><b>System Information:</b><br>
+        Connection: <span id="connectionStatus">Loading...</span><br>
+        Next Winding: <span id="nextWinding">Not scheduled</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

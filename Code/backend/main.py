@@ -8,7 +8,7 @@ gc.collect()
 # Add a small delay to ensure WiFi is fully ready
 time.sleep(2)
 
-print('Starting Fish Feeder System...')
+print('Starting Watch Winder System...')
 print('Free memory:', gc.mem_free())
 
 try:
@@ -17,9 +17,9 @@ try:
     print('Scheduler service imported')
     gc.collect()
     
-    # Start the feeding scheduler (this creates an asyncio task)
+    # Start the winding scheduler (this creates an asyncio task)
     scheduler_service.start_scheduler()
-    print('Feeding scheduler started')
+    print('Winding scheduler started')
     gc.collect()
     
     # Import and start API server
