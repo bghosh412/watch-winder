@@ -101,8 +101,9 @@ def send_response(conn, status, content_type, body):
 
 def handle_request(conn, request):
     gc.collect()
-    method = None
-    path = None
+    method = 'GET'  # Default values
+    path = '/'
+    body_data = {}
     try:
         # Handle empty request
         if not request or len(request) == 0:
@@ -122,13 +123,16 @@ def handle_request(conn, request):
         print('Request: {} {}'.format(method, path))
         
         # Parse body if POST
-        body_data = {}
         if method == 'POST':
-            body_start = request.find(b'\r\n\r\n')
-            if body_start != -1:
-                body = request[body_start+4:].decode()
-                if body:
-                    body_data = parse_simple_json(body)
+            try:
+                body_start = request.find(b'\r\n\r\n')
+                if body_start != -1:
+                    body = request[body_start+4:].decode()
+                    if body:
+                        body_data = parse_simple_json(body)
+            except Exception as body_err:
+                print('Error parsing POST body:', body_err)
+                body_data = {}
         
         # /api/home endpoint: serve status for frontend
         if path == '/api/home':
@@ -161,7 +165,6 @@ def handle_request(conn, request):
                     'nextWinding': next_winding
                 })
                 send_response(conn, '200 OK', 'application/json', result)
-                del result, wind_remaining, last_winding, next_winding, battery_status
                 gc.collect()
                 return
             except Exception as e:
@@ -195,13 +198,11 @@ def handle_request(conn, request):
                         
                         result = json_encode({'status': 'ok', 'message': f'Winding completed for {duration} minutes', 'duration': duration})
                         send_response(conn, '200 OK', 'application/json', result)
-                        del result
                         gc.collect()
                         return
                     else:
                         result = json_encode({'status': 'error', 'message': 'Failed to wind watch'})
                         send_response(conn, '500 Internal Server Error', 'application/json', result)
-                        del result
                         gc.collect()
                         return
                 except Exception as e:
@@ -221,7 +222,6 @@ def handle_request(conn, request):
                     with open('data/schedule.txt', 'r') as f:
                         schedule_data = parse_simple_json(f.read())
                     send_response(conn, '200 OK', 'application/json', json_encode(schedule_data))
-                    del schedule_data
                     gc.collect()
                     return
                 except Exception as e:
@@ -239,7 +239,6 @@ def handle_request(conn, request):
                         }
                     }
                     send_response(conn, '200 OK', 'application/json', json_encode(default))
-                    del default
                     gc.collect()
                     return
             elif method == 'POST':
@@ -267,7 +266,6 @@ def handle_request(conn, request):
                     with open('data/motor.txt', 'r') as f:
                         motor_data = parse_simple_json(f.read())
                     send_response(conn, '200 OK', 'application/json', json_encode(motor_data))
-                    del motor_data
                     gc.collect()
                     return
                 except Exception as e:
@@ -275,7 +273,80 @@ def handle_request(conn, request):
                     # Return default motor config
                     default = {'duty_cycle': 71, 'pulse_width': 180}
                     send_response(conn, '200 OK', 'application/json', json_encode(default))
-                    del default
+                    gc.collect()
+                    return
+        
+        # /api/system/memory endpoint: get memory info
+        elif path == '/api/system/memory':
+            if method == 'GET':
+                try:
+                    import gc
+                    mem_free = gc.mem_free()
+                    mem_alloc = gc.mem_alloc()
+                    response_data = {
+                        'free_memory': mem_free,
+                        'allocated_memory': mem_alloc,
+                        'total_memory': mem_free + mem_alloc
+                    }
+                    send_response(conn, '200 OK', 'application/json', json_encode(response_data))
+                    gc.collect()
+                    return
+                except Exception as e:
+                    print('Error getting memory info:', e)
+                    send_response(conn, '500 Internal Server Error', 'application/json', json_encode({'error': str(e)}))
+                    gc.collect()
+                    return
+        
+        # /api/system/uptime endpoint: get system uptime
+        elif path == '/api/system/uptime':
+            if method == 'GET':
+                try:
+                    uptime_seconds = int(time.time() - SERVER_START_TIME)
+                    response_data = {'uptime': uptime_seconds}
+                    send_response(conn, '200 OK', 'application/json', json_encode(response_data))
+                    gc.collect()
+                    return
+                except Exception as e:
+                    print('Error getting uptime:', e)
+                    send_response(conn, '500 Internal Server Error', 'application/json', json_encode({'error': str(e)}))
+                    gc.collect()
+                    return
+        
+        # /api/config endpoint: get configuration
+        elif path == '/api/config':
+            if method == 'GET':
+                try:
+                    import config
+                    response_data = {
+                        'ntfy_topic': config.NTFY_TOPIC if hasattr(config, 'NTFY_TOPIC') else 'N/A',
+                        'ntfy_server': config.NTFY_SERVER if hasattr(config, 'NTFY_SERVER') else 'N/A',
+                        'send_notifications': config.SEND_NOTIFICATIONS if hasattr(config, 'SEND_NOTIFICATIONS') else False,
+                        'mdns_hostname': config.MDNS_HOSTNAME if hasattr(config, 'MDNS_HOSTNAME') else 'winder',
+                        'debug': config.DEBUG if hasattr(config, 'DEBUG') else False
+                    }
+                    send_response(conn, '200 OK', 'application/json', json_encode(response_data))
+                    gc.collect()
+                    return
+                except Exception as e:
+                    print('Error reading config:', e)
+                    default_config = {'ntfy_topic': 'N/A', 'ntfy_server': 'N/A', 'send_notifications': False}
+                    send_response(conn, '200 OK', 'application/json', json_encode(default_config))
+                    gc.collect()
+                    return
+        
+        # /api/events endpoint: get event log
+        elif path == '/api/events':
+            if method == 'GET':
+                try:
+                    import event_log_service
+                    events = event_log_service.get_recent_events(50)
+                    response_data = {'events': events}
+                    send_response(conn, '200 OK', 'application/json', json_encode(response_data))
+                    gc.collect()
+                    return
+                except Exception as e:
+                    print('Error reading events:', e)
+                    send_response(conn, '200 OK', 'application/json', json_encode({'events': []}))
                     gc.collect()
                     return
 
@@ -359,10 +430,12 @@ def handle_request(conn, request):
         gc.collect()
     except Exception as e:
         print('Error handling request:', e)
+        import sys
+        sys.print_exception(e)
         try:
             send_response(conn, '500 Internal Server Error', 'application/json', json_encode({'error': str(e)}))
-        except:
-            pass
+        except Exception as e2:
+            print('Error sending error response:', e2)
 
 class SimpleServer:
     def __init__(self):

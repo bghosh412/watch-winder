@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"name": "serial://dev/ttyACM0",
+			"uri": "serial:///dev/ttyacm0/"
+		},
+		{
+			"path": "../../../Watch-winder-Arduino"
+		}
+	],
+	"settings": {}
+}

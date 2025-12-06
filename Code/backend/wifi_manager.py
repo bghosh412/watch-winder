@@ -46,6 +46,14 @@ class WifiManager:
 
     def connect(self, retries=1):
         import gc
+        import machine
+        
+        # XIAO ESP32C3: Enable PCB antenna via GPIO3
+        try:
+            antenna_pin = machine.Pin(3, machine.Pin.OUT)
+            antenna_pin.value(0)  # 0 = Use PCB antenna
+        except:
+            pass
         
         if self.wlan_sta.isconnected():
             return
@@ -109,36 +117,151 @@ class WifiManager:
 
     def wifi_connect(self, ssid, password):
         import gc
+        import machine
+        
+        # XIAO ESP32C3: Enable PCB antenna via GPIO3
+        try:
+            antenna_pin = machine.Pin(3, machine.Pin.OUT)
+            antenna_pin.value(0)  # 0 = Use PCB antenna
+        except:
+            pass
         
         # Free memory before connection attempt
         gc.collect()
         
-        print('Trying to connect to:', ssid)
-        self.wlan_sta.connect(ssid, password)
-        for _ in range(100):
+        # Disconnect any existing connection first
+        if self.wlan_sta.isconnected():
+            print('Disconnecting from existing network...')
+            self.wlan_sta.disconnect()
+            time.sleep(1)
+        
+        # Ensure STA is active
+        if not self.wlan_sta.active():
+            print('Activating STA interface...')
+            self.wlan_sta.active(True)
+            time.sleep(1)
+        
+        print('Connecting to SSID:', ssid)
+        print('Using password of length:', len(password))
+        
+        try:
+            self.wlan_sta.connect(ssid, password)
+        except Exception as e:
+            print('Connection initiation error:', e)
+            return False
+        
+        # Wait up to 20 seconds for connection
+        for i in range(200):
             if self.wlan_sta.isconnected():
-                print('\nConnected! Network information:', self.wlan_sta.ifconfig())
+                print('\nConnected successfully!')
+                print('IP address:', self.wlan_sta.ifconfig()[0])
+                print('Network info:', self.wlan_sta.ifconfig())
                 
                 # Clean up after successful connection
                 gc.collect()
                 
                 return True
             else:
+                # Check status for better error reporting
+                status = self.wlan_sta.status()
+                if i % 10 == 0:
+                    print('Connection status:', status)
+                
+                # Status codes:
+                # 1001 = connecting
+                # 201 = no AP found
+                # 202 = wrong password
+                # 203 = timeout
+                if status == 202:
+                    print('\nConnection failed: Wrong password!')
+                    break
+                elif status == 201:
+                    print('\nConnection failed: Network not found!')
+                    break
+                elif status == 203:
+                    print('\nConnection failed: Timeout!')
+                    break
+                
                 print('.', end='')
                 time.sleep_ms(100)
-        print('\nConnection failed!')
+        
+        print('\nConnection failed after timeout')
+        print('Final status:', self.wlan_sta.status())
         self.wlan_sta.disconnect()
         return False
 
     
     def web_server(self):
         import gc
+        import machine
         
         # Free memory before starting web server
         gc.collect()
         
+        # XIAO ESP32C3: Enable PCB antenna via GPIO3
+        print('Starting AP mode on ESP32-C3...')
+        try:
+            print('Configuring XIAO ESP32C3 antenna...')
+            antenna_pin = machine.Pin(3, machine.Pin.OUT)
+            antenna_pin.value(0)  # 0 = Use PCB antenna
+            print('PCB antenna enabled via GPIO3')
+        except Exception as e:
+            print('Antenna config:', e)
+        
+        time.sleep_ms(500)
+        
+        # CRITICAL for ESP32-C3: Must disable station mode first
+        print('Disabling station mode...')
+        self.wlan_sta.active(False)
+        time.sleep_ms(200)
+        
+        # Deactivate AP first to ensure clean state
+        print('Deactivating AP...')
+        self.wlan_ap.active(False)
+        time.sleep_ms(200)
+        
+        
+        # Activate AP with ESP32-C3 compatible settings
+        print('Activating AP...')
         self.wlan_ap.active(True)
-        self.wlan_ap.config(essid = self.ap_ssid, password = self.ap_password, authmode = self.ap_authmode)
+        time.sleep(1)
+        
+        # ESP32-C3: Configure with minimal settings first
+        print('Configuring AP with SSID:', self.ap_ssid)
+        try:
+            # Set transmit power to maximum (helps visibility)
+            self.wlan_ap.config(txpower=20)
+        except:
+            pass  # Some firmware versions don't support txpower
+        
+        # Configure essid first, then other params
+        self.wlan_ap.config(essid=self.ap_ssid)
+        time.sleep_ms(500)
+        self.wlan_ap.config(password=self.ap_password)
+        time.sleep_ms(500)
+        self.wlan_ap.config(authmode=self.ap_authmode)
+        time.sleep_ms(500)
+        
+        # Try configuring channel separately
+        try:
+            self.wlan_ap.config(channel=6)
+            print('Channel set to 6')
+        except Exception as e:
+            print('Could not set channel:', e)
+        
+        time.sleep(2)  # Give AP time to fully initialize and broadcast
+        
+        # Verify AP is active
+        if self.wlan_ap.active():
+            print('AP is ACTIVE')
+            print('AP config:', self.wlan_ap.ifconfig())
+            print('AP status:', self.wlan_ap.status())
+            cfg = self.wlan_ap.config('essid')
+            print('Broadcasting SSID:', cfg)
+        else:
+            print('ERROR: AP failed to activate!')
+            return
+        
         server_socket = socket.socket()
         server_socket.close()
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -193,7 +316,7 @@ class WifiManager:
     def send_header(self, status_code = 200):
         self.client.send("""HTTP/1.1 {0} OK\r\n""".format(status_code))
         self.client.send("""Content-Type: text/html\r\n""")
-        self.client.send("""Connection: close\r\n""")
+        self.client.send("""Connection: close\r\n\r\n""")
 
 
     def send_response(self, payload, status_code = 200):
@@ -216,67 +339,149 @@ class WifiManager:
 
 
     def handle_root(self):
+        # Build the complete HTML first, then send it all at once
+        html_parts = []
+        html_parts.append("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>WiFi Manager</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
+        h1 { color: #333; }
+        .network { padding: 10px; margin: 5px 0; background: #f0f0f0; border-radius: 5px; }
+        input[type="password"] { padding: 8px; width: 200px; }
+        input[type="submit"] { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>WiFi Manager</h1>
+    <p>Select a network to connect:</p>
+    <form action="/configure" method="post" accept-charset="utf-8">
+""")
+        
+        # Ensure STA is active for scanning
+        if not self.wlan_sta.active():
+            print('Activating STA for WiFi scan...')
+            self.wlan_sta.active(True)
+            time.sleep(2)
+        
+        # Perform WiFi scan
+        print('Scanning for WiFi networks...')
+        network_count = 0
+        
+        try:
+            networks = self.wlan_sta.scan()
+            print('Raw scan returned {} results'.format(len(networks) if networks else 0))
+            
+            if networks:
+                seen_ssids = set()
+                for net in networks:
+                    try:
+                        ssid = net[0].decode("utf-8") if isinstance(net[0], bytes) else str(net[0])
+                        
+                        if ssid and ssid.strip() and ssid not in seen_ssids:
+                            seen_ssids.add(ssid)
+                            network_count += 1
+                            print('Adding network: {}'.format(ssid))
+                            html_parts.append(
+                                '<div class="network">'
+                                '<input type="radio" name="ssid" value="{}" id="net{}">'
+                                '<label for="net{}">&nbsp;{}</label>'
+                                '</div>\n'.format(ssid, network_count, network_count, ssid)
+                            )
+                    except Exception as e:
+                        print('Error processing network:', e)
+                        continue
+                
+                print('Total unique networks: {}'.format(network_count))
+        except Exception as e:
+            print('Scan error:', e)
+            import sys
+            sys.print_exception(e)
+        
+        if network_count == 0:
+            html_parts.append('<p style="color: red;">No WiFi networks found. Please refresh to try again.</p>\n')
+        
+        html_parts.append("""
+        <p><label for="password">Password:&nbsp;</label><input type="password" id="password" name="password"></p>
+        <p><input type="submit" value="Connect"></p>
+    </form>
+</body>
+</html>
+""")
+        
+        # Send complete HTML at once
+        complete_html = ''.join(html_parts)
         self.send_header()
-        self.client.sendall("""
-            <!DOCTYPE html>
-            <html lang="en">
-                <head>
-                    <title>WiFi Manager</title>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1">
-                    <link rel="icon" href="data:,">
-                </head>
-                <body>
-                    <h1>WiFi Manager</h1>
-                    <form action="/configure" method="post" accept-charset="utf-8">
-        """.format(self.ap_ssid))
-        for ssid, *_ in self.wlan_sta.scan():
-            ssid = ssid.decode("utf-8")
-            self.client.sendall("""
-                        <p><input type="radio" name="ssid" value="{0}" id="{0}"><label for="{0}">&nbsp;{0}</label></p>
-            """.format(ssid))
-        self.client.sendall("""
-                        <p><label for="password">Password:&nbsp;</label><input type="password" id="password" name="password"></p>
-                        <p><input type="submit" value="Connect"></p>
-                    </form>
-                </body>
-            </html>
-        """)
+        self.client.sendall(complete_html)
         self.client.close()
 
 
     def handle_configure(self):
-        match = re.search('ssid=([^&]*)&password=(.*)', self.url_decode(self.request))
+        # Decode the request first
+        decoded_request = self.url_decode(self.request)
+        print('Decoded request:', decoded_request)
+        
+        # Extract the POST body (after \r\n\r\n)
+        body_start = decoded_request.find(b'\r\n\r\n')
+        if body_start != -1:
+            post_body = decoded_request[body_start + 4:]
+            print('POST body:', post_body)
+        else:
+            post_body = decoded_request
+        
+        # Match SSID and password from form data
+        match = re.search(b'ssid=([^&]*)&password=([^&\r\n]*)', post_body)
         if match:
             ssid = match.group(1).decode('utf-8')
             password = match.group(2).decode('utf-8')
+            
+            print('Attempting connection to SSID:', ssid)
+            print('Password (for debug):', password)
+            print('Password length:', len(password))
+            
             if len(ssid) == 0:
                 self.send_response("""
-                    <p>SSID must be providaded!</p>
-                    <p>Go back and try again!</p>
+                    <p style="color: red;">SSID must be provided!</p>
+                    <p><a href="/">Go back and try again</a></p>
                 """, 400)
             elif self.wifi_connect(ssid, password):
                 self.send_response("""
-                    <p>Successfully connected to</p>
-                    <h1>{0}</h1>
-                    <p>IP address: {1}</p>
+                    <h2 style="color: green;">Successfully connected!</h2>
+                    <p><strong>Network:</strong> {0}</p>
+                    <p><strong>IP address:</strong> {1}</p>
+                    <p>The device will now restart and connect automatically.</p>
                 """.format(ssid, self.wlan_sta.ifconfig()[0]))
                 profiles = self.read_credentials()
                 profiles[ssid] = password
                 self.write_credentials(profiles)
-                time.sleep(5)
+                print('Credentials saved. Rebooting...')
+                time.sleep(3)
             else:
                 self.send_response("""
-                    <p>Could not connect to</p>
-                    <h1>{0}</h1>
-                    <p>Go back and try again!</p>
+                    <h2 style="color: red;">Connection Failed</h2>
+                    <p>Could not connect to: <strong>{0}</strong></p>
+                    <p>Please check:</p>
+                    <ul>
+                        <li>Password is correct</li>
+                        <li>Network is within range</li>
+                        <li>Network is operational</li>
+                    </ul>
+                    <p><a href="/">Go back and try again</a></p>
                 """.format(ssid))
-                time.sleep(5)
+                time.sleep(2)
         else:
+            print('Could not parse form data')
+            print('Raw request:', self.request)
             self.send_response("""
-                <p>Parameters not found!</p>
+                <p style="color: red;">Could not parse form data!</p>
+                <p>Please try again.</p>
+                <p><a href="/">Go back</a></p>
             """, 400)
-            time.sleep(5)
+            time.sleep(2)
 
 
     def handle_not_found(self):

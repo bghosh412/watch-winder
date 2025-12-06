@@ -127,7 +127,18 @@ def get_motor_service():
     """Get or create the global motor service instance."""
     global _motor_service
     if _motor_service is None:
-        _motor_service = MotorService()
+        # Import config to get motor pin configuration
+        try:
+            import config
+            _motor_service = MotorService(
+                pin_in1=config.MOTOR_PIN_1,
+                pin_in2=config.MOTOR_PIN_2,
+                pin_in3=config.MOTOR_PIN_3,
+                pin_in4=config.MOTOR_PIN_4
+            )
+        except ImportError:
+            # Fall back to default pins if config not available
+            _motor_service = MotorService()
     return _motor_service
 
 def wind_watch(duration_minutes=30, direction=1):

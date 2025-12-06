@@ -20,11 +20,18 @@ MOTOR_STEPS_PER_FEEDING = 512  # Full rotation for 28BYJ-48
 MOTOR_SPEED_MS = 2  # Delay between steps in milliseconds
 
 # Motor pins (GPIO numbers connected to ULN2003)
-# For ESP32: Actual wiring: IN1=D21, IN2=D18, IN3=D5, IN4=TX2
-MOTOR_PIN_1 = 19  # D19 → IN1 (ESP32)
-MOTOR_PIN_2 = 18  # D18 → IN2 (ESP32)
-MOTOR_PIN_3 = 5   # D5 → IN3 (ESP32)
-MOTOR_PIN_4 = 17  # TX2 → IN4 (ESP32)
+# For ESP32-C3 (XIAO ESP32C3): Use GPIO4, GPIO5, GPIO6, GPIO7
+# These are safe general-purpose I/O pins on ESP32-C3
+MOTOR_PIN_1 = 4   # GPIO4 → IN1 (ESP32-C3)
+MOTOR_PIN_2 = 5   # GPIO5 → IN2 (ESP32-C3)
+MOTOR_PIN_3 = 6   # GPIO6 → IN3 (ESP32-C3)
+MOTOR_PIN_4 = 7   # GPIO7 → IN4 (ESP32-C3)
+
+# For regular ESP32 (uncomment if using ESP32):
+# MOTOR_PIN_1 = 19  # D19 → IN1 (ESP32)
+# MOTOR_PIN_2 = 18  # D18 → IN2 (ESP32)
+# MOTOR_PIN_3 = 5   # D5 → IN3 (ESP32)
+# MOTOR_PIN_4 = 17  # TX2 → IN4 (ESP32)
 
 # For ESP8266 (uncomment if using ESP8266):
 # MOTOR_PIN_1 = 12  # D6
