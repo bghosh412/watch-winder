@@ -1,0 +1,1 @@
+{"duty_cycle": 70, "pulse_width": 160}

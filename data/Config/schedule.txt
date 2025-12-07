@@ -1,0 +1,1 @@
+{"winding_duration": 30, "winding_times": [{"hour": 8, "minute": 0, "ampm": "AM"}, {"hour": 8, "minute": 0, "ampm": "PM"}], "days": {"Monday": true, "Tuesday": true, "Wednesday": true, "Thursday": true, "Friday": true, "Saturday": true, "Sunday": true}}

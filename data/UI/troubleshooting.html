@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Troubleshooting - Watch Winder</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      // Load system details
+      Promise.all([
+        fetch('/api/system/memory').then(r => r.json()),
+        fetch('/api/system/uptime').then(r => r.json()),
+        fetch('/api/config').then(r => r.json()),
+        fetch('/api/motor').then(r => r.json())
+      ]).then(([memory, uptime, config, motor]) => {
+        // System details
+        document.getElementById('freeMemory').textContent = Math.round(memory.free_memory / 1024) + 'KB';
+        
+        const hours = Math.floor(uptime.uptime / 3600);
+        const minutes = Math.floor((uptime.uptime % 3600) / 60);
+        document.getElementById('systemUptime').textContent = hours + ' hours ' + minutes + ' min';
+        
+        document.getElementById('ntfyChannel').textContent = config.ntfy_topic || 'N/A';
+        
+        // Motor details
+        document.getElementById('dutyCycle').textContent = motor.duty_cycle || 'N/A';
+        document.getElementById('pulseWidth').textContent = motor.pulse_width ? motor.pulse_width + 'ms' : 'N/A';
+      }).catch(err => {
+        console.error('Failed to load system details:', err);
+      });
+    });
+
+    function downloadLog() {
+      fetch('/api/events')
+        .then(r => r.json())
+        .then(data => {
+          const events = data.events || [];
+          let logContent = 'Watch Winder Event Log\n';
+          logContent += '======================\n\n';
+          events.forEach(event => {
+            logContent += event + '\n';
+          });
+          
+          const blob = new Blob([logContent], { type: 'text/plain' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'watch-winder-log.txt';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        })
+        .catch(err => {
+          alert('Failed to download log: ' + err.message);
+        });
+    }
+  </script>
+  <div class="header">
+    <div class="header-content">
+      <div class="header-logo">
+        <img src="assets/images/Home.png" alt="Watch Winder Logo">
+      </div>
+      <div class="header-title">
+        <h1>What's the time now?</h1>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;">
+    <div class="sidebar">
+      <b>Quick Links</b><br>
+      <a href="index.html" class="quick-link">Home</a>
+      <a href="setschedule.html" class="quick-link">Set Winding Schedule</a>
+      <a href="windnow.html" class="quick-link">Wind Now</a>
+      <a href="setquantity.html" class="quick-link">Set Wind Count</a>
+      <a href="calibration.html" class="quick-link">Calibration</a>
+      <a href="troubleshooting.html" class="quick-link">Troubleshooting</a>
+    </div>
+    <div style="flex:1; padding:20px;">
+      <div class="card">
+        <h2>Troubleshooting Details</h2>
+        
+        <div style="background-color:#17607D; color:white; padding:10px; margin-bottom:15px; font-weight:bold;">
+          System details:
+        </div>
+        <div style="background-color:white; padding:15px; border:1px solid #ccc; margin-bottom:20px;">
+          <div style="margin-bottom:8px;"><b>Free memory:</b> <span id="freeMemory">Loading...</span></div>
+          <div style="margin-bottom:8px;"><b>System Up time:</b> <span id="systemUptime">Loading...</span></div>
+          <div><b>Ntfy Channel Name:</b> <span id="ntfyChannel">Loading...</span></div>
+        </div>
+
+        <div style="background-color:#17607D; color:white; padding:10px; margin-bottom:15px; font-weight:bold;">
+          Motor details:
+        </div>
+        <div style="background-color:white; padding:15px; border:1px solid #ccc; margin-bottom:20px;">
+          <div style="margin-bottom:8px;"><b>Duty Cycle:</b> <span id="dutyCycle">Loading...</span></div>
+          <div><b>Pulse Width:</b> <span id="pulseWidth">Loading...</span></div>
+        </div>
+
+        <button onclick="downloadLog()" style="padding:10px 30px; font-size:16px; background-color:#17607D; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+          Download Log
+        </button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

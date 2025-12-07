@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Set Winding Schedule - Watch Winder</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      // Load current schedule
+      fetch('/api/schedule')
+        .then(r => r.json())
+        .then(data => {
+          if (data.winding_duration) {
+            document.getElementById('windingDuration').value = data.winding_duration;
+          }
+          if (data.winding_times && data.winding_times.length >= 2) {
+            // Winding Time 1
+            document.getElementById('hour1').value = data.winding_times[0].hour || 8;
+            document.getElementById('minute1').value = data.winding_times[0].minute || 0;
+            document.getElementById('ampm1').value = data.winding_times[0].ampm || 'AM';
+            // Winding Time 2
+            document.getElementById('hour2').value = data.winding_times[1].hour || 8;
+            document.getElementById('minute2').value = data.winding_times[1].minute || 0;
+            document.getElementById('ampm2').value = data.winding_times[1].ampm || 'PM';
+          }
+          if (data.days) {
+            Object.keys(data.days).forEach(day => {
+              const checkbox = document.getElementById(day.toLowerCase());
+              if (checkbox) {
+                checkbox.checked = data.days[day];
+              }
+            });
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load schedule:', err);
+        });
+    });
+
+    function saveSchedule() {
+      const schedule = {
+        winding_duration: parseInt(document.getElementById('windingDuration').value),
+        winding_times: [
+          {
+            hour: parseInt(document.getElementById('hour1').value),
+            minute: parseInt(document.getElementById('minute1').value),
+            ampm: document.getElementById('ampm1').value
+          },
+          {
+            hour: parseInt(document.getElementById('hour2').value),
+            minute: parseInt(document.getElementById('minute2').value),
+            ampm: document.getElementById('ampm2').value
+          }
+        ],
+        days: {
+          Monday: document.getElementById('monday').checked,
+          Tuesday: document.getElementById('tuesday').checked,
+          Wednesday: document.getElementById('wednesday').checked,
+          Thursday: document.getElementById('thursday').checked,
+          Friday: document.getElementById('friday').checked,
+          Saturday: document.getElementById('saturday').checked,
+          Sunday: document.getElementById('sunday').checked
+        }
+      };
+
+      fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(schedule)
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === 'ok') {
+            alert('Schedule saved successfully!');
+          } else {
+            alert('Failed to save schedule: ' + (data.error || 'Unknown error'));
+          }
+        })
+        .catch(err => {
+          alert('Error saving schedule: ' + err.message);
+        });
+    }
+  </script>
+  <div class="header">
+    <div class="header-content">
+      <div class="header-logo">
+        <img src="assets/images/Home.png" alt="Watch Winder Logo">
+      </div>
+      <div class="header-title">
+        <h1>Set Winding Schedule</h1>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;">
+    <div class="sidebar">
+      <b>Quick Links</b><br>
+      <a href="index.html" class="quick-link">Home</a>
+      <a href="setschedule.html" class="quick-link">Set Winding Schedule</a>
+      <a href="windnow.html" class="quick-link">Wind Now</a>
+      <a href="setquantity.html" class="quick-link">Set Wind Count</a>
+      <a href="calibration.html" class="quick-link">Calibration</a>
+      <a href="troubleshooting.html" class="quick-link">Troubleshooting</a>
+    </div>
+    <div style="flex:1; padding:20px;">
+      <div class="card">
+        <h2>Configure Winding Schedule</h2>
+        
+        <div style="margin-bottom:20px;">
+          <label style="display:block; margin-bottom:5px;"><b>Winding Duration (minutes):</b></label>
+          <select id="windingDuration" style="padding:8px; width:200px; font-size:14px;">
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30" selected>30 minutes</option>
+            <option value="60">60 minutes</option>
+            <option value="90">90 minutes</option>
+            <option value="120">120 minutes</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label style="display:block; margin-bottom:5px;"><b>Winding Starting Speed:</b></label>
+          <select id="windingSpeed" style="padding:8px; width:200px; font-size:14px;">
+            <option value="Very High">Very High</option>
+            <option value="High">High</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="Low">Low</option>
+            <option value="Very Low">Very Low</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label style="display:block; margin-bottom:5px;"><b>Winding Time 1:</b></label>
+          <select id="hour1" style="padding:8px; margin-right:5px;">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8" selected>8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+          </select>
+          <select id="minute1" style="padding:8px; margin-right:5px;">
+            <option value="0" selected>00</option>
+            <option value="15">15</option>
+            <option value="30">30</option>
+            <option value="45">45</option>
+          </select>
+          <select id="ampm1" style="padding:8px;">
+            <option value="AM" selected>AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label style="display:block; margin-bottom:5px;"><b>Winding Time 2:</b></label>
+          <select id="hour2" style="padding:8px; margin-right:5px;">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8" selected>8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+          </select>
+          <select id="minute2" style="padding:8px; margin-right:5px;">
+            <option value="0" selected>00</option>
+            <option value="15">15</option>
+            <option value="30">30</option>
+            <option value="45">45</option>
+          </select>
+          <select id="ampm2" style="padding:8px;">
+            <option value="AM">AM</option>
+            <option value="PM" selected>PM</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label style="display:block; margin-bottom:10px;"><b>Active Days:</b></label>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <label><input type="checkbox" id="monday" checked> Monday</label>
+            <label><input type="checkbox" id="tuesday" checked> Tuesday</label>
+            <label><input type="checkbox" id="wednesday" checked> Wednesday</label>
+            <label><input type="checkbox" id="thursday" checked> Thursday</label>
+            <label><input type="checkbox" id="friday" checked> Friday</label>
+            <label><input type="checkbox" id="saturday" checked> Saturday</label>
+            <label><input type="checkbox" id="sunday" checked> Sunday</label>
+          </div>
+        </div>
+
+        <button onclick="saveSchedule()" style="padding:10px 30px; font-size:16px; background-color:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer;">
+          Save Schedule
+        </button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
