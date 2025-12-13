@@ -106,6 +106,40 @@
         <button onclick="downloadLog()" style="padding:10px 30px; font-size:16px; background-color:#17607D; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
           Download Log
         </button>
+        <button onclick="checkOtaUpdate()" style="margin-left:20px; padding:10px 30px; font-size:16px; background-color:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+          Check for OTA Update
+        </button>
+        <div id="otaStatus" style="margin-top:15px; font-size:15px; color:#17607D;"></div>
+        <script>
+        function checkOtaUpdate() {
+          const statusEl = document.getElementById('otaStatus');
+          statusEl.textContent = 'Checking for update...';
+          fetch('/api/check_update')
+            .then(r => r.json())
+            .then(data => {
+              if (data.update_available) {
+                if (confirm('New firmware version ' + data.remote_version + ' is available. Update now?')) {
+                  statusEl.textContent = 'Updating...';
+                  fetch('/api/do_update', {method:'POST'})
+                    .then(r2 => r2.json())
+                    .then(data2 => {
+                      if (data2.status === 'ok') {
+                        statusEl.textContent = 'Update successful! Rebooting...';
+                      } else {
+                        statusEl.textContent = 'Update failed: ' + (data2.error || 'Unknown error');
+                      }
+                    })
+                    .catch(err => { statusEl.textContent = 'Update error: ' + err.message; });
+                } else {
+                  statusEl.textContent = 'Update canceled.';
+                }
+              } else {
+                statusEl.textContent = 'No update available. Current version: ' + data.local_version;
+              }
+            })
+            .catch(err => { statusEl.textContent = 'Check error: ' + err.message; });
+        }
+        </script>
       </div>
     </div>
   </div>

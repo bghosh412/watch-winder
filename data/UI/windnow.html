@@ -13,19 +13,20 @@
   <script>
     function windNow() {
       const duration = parseInt(document.getElementById('duration').value);
-      
-      if (!confirm(`Wind watch for ${duration} minutes?`)) {
+      const speed = document.getElementById('speed').value;
+
+      if (!confirm(`Wind watch for ${duration} minutes at ${speed} speed?`)) {
         return;
       }
-      
+
       const statusEl = document.getElementById('status');
       statusEl.textContent = 'Winding...';
       statusEl.style.color = 'blue';
-      
+
       fetch('/api/windnow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duration: duration })
+        body: JSON.stringify({ duration: duration, speed: speed })
       })
         .then(r => r.json())
         .then(data => {
@@ -81,6 +82,16 @@
             <option value="60">60 minutes</option>
             <option value="90">90 minutes</option>
             <option value="120">120 minutes</option>
+          </select>
+        </div>
+        <div style="margin-bottom:20px;">
+          <label style="display:block; margin-bottom:5px;"><b>Winding Speed:</b></label>
+          <select id="speed" style="padding:8px; width:200px; font-size:14px;">
+            <option value="Very Slow">Very Slow</option>
+            <option value="Slow">Slow</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="Fast">Fast</option>
+            <option value="Very Fast">Very Fast</option>
           </select>
         </div>
 
