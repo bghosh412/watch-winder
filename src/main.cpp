@@ -11,10 +11,11 @@
 #include "NtfyClient.h"
 
 // Define your stepper motor pins here (change as per your wiring)
+
 #define STEPPER_IN1 D1
 #define STEPPER_IN2 D2
 #define STEPPER_IN3 D3
-#define STEPPER_IN4 D4
+#define STEPPER_IN4 D5 // Changed from D4 to D5 to avoid onboard LED
 
 ESP8266WebServer server(80);
 StepperMotorDriver stepper(STEPPER_IN1, STEPPER_IN2, STEPPER_IN3, STEPPER_IN4);
@@ -25,6 +26,7 @@ String readFile(const char* path);
 bool writeFile(const char* path, const String& content);
 void updateNextWindingTime();
 void loadNextWindingTime();
+void saveLastWindingTime();
 void getWindingParams(int& duration, String& speed);
 void handleRoot();
 void handleSetSchedule();
@@ -42,6 +44,7 @@ void handleApiUptime();
 void handleApiEvents();
 void handleApiCheckUpdate();
 void handleApiDoUpdate();
+void handleApiStop();
 void handleStaticFile();
 
 // Scheduled winding state
@@ -49,6 +52,7 @@ time_t nextWindingEpoch = 0;
 unsigned long lastScheduleCheck = 0;
 const unsigned long SCHEDULE_CHECK_INTERVAL = 300 * 1000UL; // 300 seconds
 bool scheduledWindingInProgress = false;
+bool manualWindingInProgress = false;
 
 // Helper function implementations
 String readFile(const char* path) {
@@ -59,6 +63,7 @@ String readFile(const char* path) {
   }
   String content = file.readString();
   file.close();
+  content.trim();
   return content;
 }
 
@@ -100,6 +105,16 @@ void loadNextWindingTime() {
   nextWindingEpoch = parseISO8601(nextWindingStr);
 }
 
+void saveLastWindingTime() {
+  time_t now = time(nullptr);
+  struct tm t;
+  localtime_r(&now, &t);
+  String iso = formatISO8601(t);
+  writeFile("/Config/last_winding.txt", iso);
+  Serial.printf("[WINDING] Last winding time saved: %s\n", iso.c_str());
+  iso = String();
+}
+
 void getWindingParams(int& duration, String& speed) {
   String sched = readFile("/Config/schedule.txt");
   duration = 30;
@@ -111,7 +126,9 @@ void getWindingParams(int& duration, String& speed) {
       if (doc.containsKey("winding_duration")) duration = doc["winding_duration"];
       if (doc.containsKey("winding_speed")) speed = String(doc["winding_speed"].as<const char*>());
     }
+    doc.clear();
   }
+  sched = String();
 }
 
 void updateNextWindingTime() {
@@ -131,6 +148,9 @@ void updateNextWindingTime() {
     const char* dayName = weekdayName(wday);
     if (!days[dayName] || !days[dayName].as<bool>()) continue;
     for (JsonVariant timeObj : times) {
+      // Skip if this time slot is disabled
+      if (timeObj.containsKey("enabled") && !timeObj["enabled"].as<bool>()) continue;
+      
       int hour = timeObj["hour"];
       int minute = timeObj["minute"];
       String ampm = timeObj["ampm"].as<String>();
@@ -152,9 +172,14 @@ void updateNextWindingTime() {
     writeFile("/Config/next_winding.txt", iso);
     nextWindingEpoch = soonest;
     Serial.printf("[SCHEDULE] Next winding scheduled for %s\n", iso.c_str());
+    iso = String();
   } else {
     Serial.println("[SCHEDULE] No valid next winding time found.");
   }
+  
+  // Cleanup
+  doc.clear();
+  sched = String();
 }
 
 // HTML route handlers
@@ -210,20 +235,43 @@ void handleApiHome() {
   Serial.println("[API] GET /api/home");
   yield();
 
-  String lastWinding = readFile("/Config/last_winding.txt");
-  String nextWinding = readFile("/Config/next_winding.txt");
-  String duration = readFile("/Config/duration.txt");
-  String quantity = readFile("/Config/quantitytxt");
+  String lastWindingStr = readFile("/Config/last_winding.txt");
+  String nextWindingStr = readFile("/Config/next_winding.txt");
+  String quantity = readFile("/Config/quantity.txt");
 
   StaticJsonDocument<256> doc;
-  doc["last_winding"] = lastWinding;
-  doc["next_winding"] = nextWinding;
-  doc["duration"] = duration;
-  doc["quantity"] = quantity;
+  
+  // Connection status
+  doc["connectionStatus"] = (WiFi.status() == WL_CONNECTED) ? "Online" : "Offline";
+  
+  // Last winding time (ISO format from file)
+  if (lastWindingStr.length() > 0) {
+    doc["lastWinding"] = lastWindingStr;
+  }
+  
+  // Next winding time (ISO format from file)
+  if (nextWindingStr.length() > 0) {
+    doc["nextWinding"] = nextWindingStr;
+  } else {
+    doc["nextWinding"] = "Not scheduled";
+  }
+  
+  // Wind remaining (not implemented, placeholder)
+  doc["windRemaining"] = "N/A";
+  
+  // Battery status (not implemented, placeholder)
+  doc["batteryStatus"] = "N/A";
 
   String response;
   serializeJson(doc, response);
   server.send(200, "application/json", response);
+  
+  // Cleanup
+  doc.clear();
+  lastWindingStr = String();
+  nextWindingStr = String();
+  quantity = String();
+  response = String();
 }
 
 void handleApiScheduleGet() {
@@ -240,12 +288,14 @@ void handleApiScheduleGet() {
       String response;
       serializeJson(doc, response);
       server.send(200, "application/json", response);
+      doc.clear();
     } else {
-      server.send(500, "application/json", "{\"error\":\"Invalid schedule format\"}");
+      server.send(400, "application/json", "{\"status\":\"error\",\"error\":\"Invalid JSON\"}");
     }
   } else {
     server.send(404, "application/json", "{\"error\":\"Schedule not found\"}");
   }
+  scheduleData = String();
 }
 
 void handleApiSchedulePost() {
@@ -266,9 +316,12 @@ void handleApiSchedulePost() {
       } else {
         server.send(500, "application/json", "{\"status\":\"error\",\"error\":\"Failed to save\"}");
       }
+      doc.clear();
+      out = String();
     } else {
       server.send(400, "application/json", "{\"status\":\"error\",\"error\":\"Invalid JSON\"}");
     }
+    body = String();
   } else {
     server.send(400, "application/json", "{\"status\":\"error\",\"error\":\"No data\"}");
   }
@@ -302,11 +355,24 @@ void handleApiWindNow() {
       }
 
       stepper.runForDuration((float)duration, rpm, clockwise);
+      manualWindingInProgress = true;
 
       server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Winding started\"}");
+      
+      // Cleanup
+      doc.clear();
+      speedStr = String();
+      body = String();
   } else {
     server.send(400, "application/json", "{\"status\":\"error\",\"error\":\"No data\"}");
   }
+}
+
+void handleApiStop() {
+  Serial.println("[API] POST /api/stop - Stopping winding");
+  stepper.stop();
+  scheduledWindingInProgress = false;
+  server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Winding stopped\"}");
 }
 
 void handleApiMotorGet() {
@@ -377,16 +443,56 @@ void handleApiCheckUpdate() {
   bool updateAvailable = (remoteVersion.length() > 0 && remoteVersion != localVersion);
   String response = String("{\"local_version\":\"") + localVersion + "\",\"remote_version\":\"" + remoteVersion + "\",\"update_available\":" + (updateAvailable ? "true" : "false") + "}";
   server.send(200, "application/json", response);
+  
+  // Cleanup
+  localVersion = String();
+  remoteVersion = String();
+  response = String();
 }
 
 void handleApiDoUpdate() {
-  bool ok = OtaUpdate::updateFirmware(OTA_BIN_URL);
-  if (ok) {
-    server.send(200, "application/json", "{\"status\":\"ok\"}");
-    delay(1000);
-    ESP.restart();
-  } else {
-    server.send(500, "application/json", "{\"status\":\"error\",\"error\":\"OTA failed\"}");
+  // Get the remote version first
+  String remoteVersion = OtaUpdate::getRemoteVersion(OTA_VERSION_URL);
+  if (remoteVersion.length() == 0) {
+    Serial.println("[OTA] Failed to fetch remote version");
+    server.send(500, "application/json", "{\"status\":\"error\",\"error\":\"Failed to fetch remote version\"}");
+    remoteVersion = String();
+    return;
+  }
+  
+  Serial.printf("[OTA] Updating from local version to remote version: %s\n", remoteVersion.c_str());
+  remoteVersion = String();  // Free memory before OTA
+  
+  // Send response before starting OTA (connection will be lost during update)
+  server.send(200, "application/json", "{\"status\":\"starting\"}");
+  server.handleClient();
+  delay(500);
+  
+  // Stop motor if running
+  if (stepper.isRunning()) {
+    Serial.println("[OTA] Stopping motor for OTA update...");
+    stepper.stop();
+    delay(100);
+  }
+  
+  // Stop web server to free resources
+  Serial.println("[OTA] Stopping web server...");
+  server.stop();
+  delay(100);
+  
+  // Close LittleFS to free resources
+  Serial.println("[OTA] Closing file system...");
+  LittleFS.end();
+  delay(100);
+  
+  // Update firmware (this will reboot automatically on success)
+  Serial.println("[OTA] Starting firmware update...");
+  bool fwOk = OtaUpdate::updateFirmware(OTA_BIN_URL);
+  
+  // If firmware update succeeded, it would have rebooted. If we're here, it failed.
+  if (!fwOk) {
+    Serial.println("[OTA] Firmware update failed. Restarting web server...");
+    server.begin();
   }
 }
 
@@ -408,11 +514,11 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   NtfyClient ntfy(NTFY_TOPIC);
-  String msg = String("{\"Watch Winder is up and running at http://") + WiFi.localIP().toString() + String("\"}");
+  String msg = String("") + NTFY_MSG_STARTUP_PREFIX + WiFi.localIP().toString() + NTFY_MSG_STARTUP_SUFFIX + String("");
   ntfy.send(msg);
 
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-  Serial.print("[setup] Waiting for NTP time sync...");
+  configTime(5.5 * 3600, 0, "pool.ntp.org", "time.nist.gov");  // IST is UTC+5:30
+  Serial.print("[setup] Waiting for NTP time sync (India/Kolkata)...");
   time_t now = time(nullptr);
   while (now < 1640995200) {
     delay(500);
@@ -426,6 +532,16 @@ void setup() {
     return;
   }
   Serial.println("[setup] LittleFS mounted successfully");
+  
+  // Sync firmware version to file if different
+  String localVer = OtaUpdate::getLocalVersion();
+  if (localVer != FIRMWARE_VERSION) {
+    Serial.printf("[setup] Version mismatch! File: %s, Firmware: %s\n", localVer.c_str(), FIRMWARE_VERSION);
+    Serial.println("[setup] Updating version file...");
+    OtaUpdate::setLocalVersion(FIRMWARE_VERSION);
+  } else {
+    Serial.printf("[setup] Firmware version: %s\n", FIRMWARE_VERSION);
+  }
   
   loadNextWindingTime();
   
@@ -455,6 +571,7 @@ void setup() {
   server.on("/api/events", HTTP_GET, handleApiEvents);
   server.on("/api/check_update", HTTP_GET, handleApiCheckUpdate);
   server.on("/api/do_update", HTTP_POST, handleApiDoUpdate);
+  server.on("/api/stop", HTTP_POST, handleApiStop);
   
   server.on("/css/styles.css", handleStaticFile);
   server.onNotFound(handleStaticFile);
@@ -484,18 +601,39 @@ void loop() {
       Serial.printf("[SCHEDULE] Starting scheduled winding: %d min, %s (%.1f RPM)\n", duration, speed.c_str(), rpm);
       stepper.runForDuration((float)duration, rpm, true);
       scheduledWindingInProgress = true;
+      
+      // Update next winding time immediately after starting
+      Serial.println("[SCHEDULE] Updating next winding time...");
+      updateNextWindingTime();
     }
   }
   if (scheduledWindingInProgress && !stepper.isRunning()) {
-    Serial.println("[SCHEDULE] Scheduled winding finished. Updating next_winding.txt...");
+    Serial.println("[SCHEDULE] Scheduled winding finished.");
     scheduledWindingInProgress = false;
-    updateNextWindingTime();
+    saveLastWindingTime();
+  }
+  
+  if (manualWindingInProgress && !stepper.isRunning()) {
+    Serial.println("[MANUAL] Manual winding finished.");
+    manualWindingInProgress = false;
+    saveLastWindingTime();
   }
   
   yield();
+  
+  // Periodic heap monitoring and garbage collection
   static unsigned long lastPrint = 0;
-  if (millis() - lastPrint > 5000) {
+  static unsigned long lastGC = 0;
+  unsigned long now = millis();
+  
+  if (now - lastPrint > 5000) {
     Serial.printf("[loop] Running... Free heap: %u\n", ESP.getFreeHeap());
-    lastPrint = millis();
+    lastPrint = now;
+  }
+  
+  // Force periodic WiFi stack cleanup every 60 seconds
+  if (now - lastGC > 60000) {
+    ESP.wdtFeed();  // Feed watchdog
+    lastGC = now;
   }
 }

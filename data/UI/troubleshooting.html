@@ -17,8 +17,8 @@
         fetch('/api/system/memory').then(r => r.json()),
         fetch('/api/system/uptime').then(r => r.json()),
         fetch('/api/config').then(r => r.json()),
-        fetch('/api/motor').then(r => r.json())
-      ]).then(([memory, uptime, config, motor]) => {
+        fetch('/api/check_update').then(r => r.json())
+      ]).then(([memory, uptime, config, version]) => {
         // System details
         document.getElementById('freeMemory').textContent = Math.round(memory.free_memory / 1024) + 'KB';
         
@@ -28,9 +28,8 @@
         
         document.getElementById('ntfyChannel').textContent = config.ntfy_topic || 'N/A';
         
-        // Motor details
-        document.getElementById('dutyCycle').textContent = motor.duty_cycle || 'N/A';
-        document.getElementById('pulseWidth').textContent = motor.pulse_width ? motor.pulse_width + 'ms' : 'N/A';
+        // Firmware version
+        document.getElementById('currentVersion').textContent = version.local_version || 'Unknown';
       }).catch(err => {
         console.error('Failed to load system details:', err);
       });
@@ -61,11 +60,28 @@
           alert('Failed to download log: ' + err.message);
         });
     }
+
+    function stopWinding() {
+      if (confirm('Stop winding in progress?')) {
+        fetch('/api/stop', {method: 'POST'})
+          .then(r => r.json())
+          .then(data => {
+            if (data.status === 'ok') {
+              alert('Winding stopped successfully');
+            } else {
+              alert('Failed to stop: ' + (data.error || 'Unknown error'));
+            }
+          })
+          .catch(err => {
+            alert('Error stopping winding: ' + err.message);
+          });
+      }
+    }
   </script>
   <div class="header">
     <div class="header-content">
       <div class="header-logo">
-        <img src="assets/images/Home.png" alt="Watch Winder Logo">
+        <img src="/assets/images/Home.png" alt="Watch Winder Logo">
       </div>
       <div class="header-title">
         <h1>What's the time now?</h1>
@@ -79,7 +95,6 @@
       <a href="setschedule.html" class="quick-link">Set Winding Schedule</a>
       <a href="windnow.html" class="quick-link">Wind Now</a>
       <a href="setquantity.html" class="quick-link">Set Wind Count</a>
-      <a href="calibration.html" class="quick-link">Calibration</a>
       <a href="troubleshooting.html" class="quick-link">Troubleshooting</a>
     </div>
     <div style="flex:1; padding:20px;">
@@ -96,20 +111,27 @@
         </div>
 
         <div style="background-color:#17607D; color:white; padding:10px; margin-bottom:15px; font-weight:bold;">
-          Motor details:
+          Firmware Update:
         </div>
         <div style="background-color:white; padding:15px; border:1px solid #ccc; margin-bottom:20px;">
-          <div style="margin-bottom:8px;"><b>Duty Cycle:</b> <span id="dutyCycle">Loading...</span></div>
-          <div><b>Pulse Width:</b> <span id="pulseWidth">Loading...</span></div>
+          <div style="margin-bottom:15px;"><b>Current Firmware Version:</b> <span id="currentVersion">Loading...</span></div>
+          <button onclick="checkOtaUpdate()" style="padding:10px 30px; font-size:16px; background-color:#17607D; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+            Check for Update
+          </button>
+          <div id="otaStatus" style="margin-top:15px; font-size:15px; color:#17607D;"></div>
         </div>
 
-        <button onclick="downloadLog()" style="padding:10px 30px; font-size:16px; background-color:#17607D; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
-          Download Log
-        </button>
-        <button onclick="checkOtaUpdate()" style="margin-left:20px; padding:10px 30px; font-size:16px; background-color:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
-          Check for OTA Update
-        </button>
-        <div id="otaStatus" style="margin-top:15px; font-size:15px; color:#17607D;"></div>
+        <div style="background-color:#17607D; color:white; padding:10px; margin-bottom:15px; font-weight:bold;">
+          Actions:
+        </div>
+        <div style="display:flex; flex-direction:column; gap:15px; margin-top:10px; align-items:flex-start;">
+          <button onclick="downloadLog()" style="padding:10px 30px; font-size:16px; background-color:#17607D; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+            Download Log
+          </button>
+          <button onclick="stopWinding()" style="padding:10px 30px; font-size:16px; background-color:#17607D; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+            Stop Winding
+          </button>
+        </div>
         <script>
         function checkOtaUpdate() {
           const statusEl = document.getElementById('otaStatus');

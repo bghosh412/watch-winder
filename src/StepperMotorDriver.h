@@ -17,6 +17,7 @@ public:
     void start(int steps, bool clockwise = true);
     void update(); // call frequently from loop()
     bool isRunning() const;
+    void stop(); // stop running motor
 
 private:
     int _in1, _in2, _in3, _in4;

@@ -18,13 +18,14 @@ public:
         String url = "http://ntfy.sh/" + _topic;
         http.begin(client, url);
         http.addHeader("Content-Type", "text/plain");
+        http.addHeader("Title", "Watch Winder");
         int httpCode = http.POST(message);
         if (httpCode > 0) {
-            Serial.printf("[NtfyClient] Sent: %s (code: %d)\n", message.c_str(), httpCode);
+            Serial.printf("[NtfyClient] Sent to topic '%s': %s (code: %d)\n", _topic.c_str(), message.c_str(), httpCode);
             http.end();
             return true;
         } else {
-            Serial.printf("[NtfyClient] Failed to send: %s (code: %d)\n", message.c_str(), httpCode);
+            Serial.printf("[NtfyClient] Failed to send to topic '%s': %s (code: %d)\n", _topic.c_str(), message.c_str(), httpCode);
             http.end();
             return false;
         }

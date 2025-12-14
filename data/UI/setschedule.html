@@ -21,10 +21,12 @@
           }
           if (data.winding_times && data.winding_times.length >= 2) {
             // Winding Time 1
+            document.getElementById('enable1').checked = data.winding_times[0].enabled !== false;
             document.getElementById('hour1').value = data.winding_times[0].hour || 8;
             document.getElementById('minute1').value = data.winding_times[0].minute || 0;
             document.getElementById('ampm1').value = data.winding_times[0].ampm || 'AM';
             // Winding Time 2
+            document.getElementById('enable2').checked = data.winding_times[1].enabled !== false;
             document.getElementById('hour2').value = data.winding_times[1].hour || 8;
             document.getElementById('minute2').value = data.winding_times[1].minute || 0;
             document.getElementById('ampm2').value = data.winding_times[1].ampm || 'PM';
@@ -48,11 +50,13 @@
         winding_duration: parseInt(document.getElementById('windingDuration').value),
         winding_times: [
           {
+            enabled: document.getElementById('enable1').checked,
             hour: parseInt(document.getElementById('hour1').value),
             minute: parseInt(document.getElementById('minute1').value),
             ampm: document.getElementById('ampm1').value
           },
           {
+            enabled: document.getElementById('enable2').checked,
             hour: parseInt(document.getElementById('hour2').value),
             minute: parseInt(document.getElementById('minute2').value),
             ampm: document.getElementById('ampm2').value
@@ -90,7 +94,7 @@
   <div class="header">
     <div class="header-content">
       <div class="header-logo">
-        <img src="assets/images/Home.png" alt="Watch Winder Logo">
+        <img src="/assets/images/Home.png" alt="Watch Winder Logo">
       </div>
       <div class="header-title">
         <h1>Set Winding Schedule</h1>
@@ -104,7 +108,6 @@
       <a href="setschedule.html" class="quick-link">Set Winding Schedule</a>
       <a href="windnow.html" class="quick-link">Wind Now</a>
       <a href="setquantity.html" class="quick-link">Set Wind Count</a>
-      <a href="calibration.html" class="quick-link">Calibration</a>
       <a href="troubleshooting.html" class="quick-link">Troubleshooting</a>
     </div>
     <div style="flex:1; padding:20px;">
@@ -135,7 +138,10 @@
         </div>
 
         <div style="margin-bottom:20px;">
-          <label style="display:block; margin-bottom:5px;"><b>Winding Time 1:</b></label>
+          <label style="display:block; margin-bottom:5px;">
+            <input type="checkbox" id="enable1" checked style="margin-right:5px;">
+            <b>Winding Time 1:</b>
+          </label>
           <select id="hour1" style="padding:8px; margin-right:5px;">
             <option value="1">1</option>
             <option value="2">2</option>
@@ -163,7 +169,10 @@
         </div>
 
         <div style="margin-bottom:20px;">
-          <label style="display:block; margin-bottom:5px;"><b>Winding Time 2:</b></label>
+          <label style="display:block; margin-bottom:5px;">
+            <input type="checkbox" id="enable2" checked style="margin-right:5px;">
+            <b>Winding Time 2:</b>
+          </label>
           <select id="hour2" style="padding:8px; margin-right:5px;">
             <option value="1">1</option>
             <option value="2">2</option>

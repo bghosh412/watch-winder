@@ -4,17 +4,14 @@
 #include "ConfigConstants.h"
 #include <time.h>
 
-// 28BYJ-48 stepper motor sequence (8 steps for half-stepping)
-const int STEPS_PER_REV = 4096; // 64*64 (gear ratio)
-const uint8_t stepSequence[8][4] = {
-    {1, 0, 0, 0},
-    {1, 1, 0, 0},
-    {0, 1, 0, 0},
-    {0, 1, 1, 0},
-    {0, 0, 1, 0},
-    {0, 0, 1, 1},
-    {0, 0, 0, 1},
-    {1, 0, 0, 1}
+// 28BYJ-48 stepper motor sequences
+// Full-step mode for higher speed and torque (4 steps per cycle)
+const int STEPS_PER_REV = 2048; // Half of 4096 because we're using full-step mode
+const uint8_t stepSequence[4][4] = {
+    {1, 0, 1, 0},  // Coils 1 & 3
+    {0, 1, 1, 0},  // Coils 2 & 3
+    {0, 1, 0, 1},  // Coils 2 & 4
+    {1, 0, 0, 1}   // Coils 1 & 4
 };
 
 // Non-blocking state machine: start a move
@@ -28,18 +25,42 @@ void StepperMotorDriver::start(int steps, bool clockwise) {
 // Non-blocking state machine: call frequently from loop()
 void StepperMotorDriver::update() {
     if (!_running) return;
+    
     unsigned long now = micros();
-    if (now - _lastStepTime >= _stepDelay) {
+    
+    // Process multiple steps if we've fallen behind
+    while (_running && (now - _lastStepTime >= _stepDelay)) {
         _currentStep += _direction;
-        if (_currentStep < 0) _currentStep = 7;
-        if (_currentStep > 7) _currentStep = 0;
+        if (_currentStep < 0) _currentStep = 3;
+        if (_currentStep > 3) _currentStep = 0;
         stepMotor(_currentStep);
-        _lastStepTime = now;
+        _lastStepTime += _stepDelay;
         _stepsRemaining--;
+        
         if (_stepsRemaining <= 0) {
             _running = false;
+            
+            // Fully release motor to remove holding torque
             release();
+            Serial.println("[Motor] Winding complete - motor released");
+            
+            // Small delay to ensure pins are fully released
+            delay(10);
+            
+            // Send completion notification
+            NtfyClient ntfy(NTFY_TOPIC);
+            char timeStr[32];
+            time_t nowT = time(nullptr);
+            strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", localtime(&nowT));
+            char msgBuf[128];
+            snprintf(msgBuf, sizeof(msgBuf), "{" NTFY_MSG_WINDING_COMPLETE "}", timeStr);
+            ntfy.send(String(msgBuf));
+            
+            break;
         }
+        
+        // Limit catch-up to prevent blocking too long
+        if (micros() - now > 5000) break; // Max 5ms per update call
     }
 }
 
@@ -47,21 +68,28 @@ bool StepperMotorDriver::isRunning() const {
     return _running;
 }
 
+void StepperMotorDriver::stop() {
+    _running = false;
+    _stepsRemaining = 0;
+    release();
+    Serial.println("[MOTOR] Stopped by user request");
+}
+
 // Adapter: run for duration (minutes) at given speed (non-blocking)
 void StepperMotorDriver::runForDuration(float durationMinutes, float rpm, bool clockwise) {
     setSpeed(rpm);
-    // Steps per revolution for 28BYJ-48
-    const int stepsPerRev = 4096;
     // Total steps = RPM * steps/rev * minutes
-    int totalSteps = (int)(rpm * stepsPerRev * durationMinutes);
+    // Use STEPS_PER_REV constant defined at top of file (2048 for full-step mode)
+    int totalSteps = (int)(rpm * STEPS_PER_REV * durationMinutes);
 
     // Send ntfy notification when winding starts
     NtfyClient ntfy(NTFY_TOPIC);
     char timeStr[32];
     time_t nowT = time(nullptr);
     strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", localtime(&nowT));
-    String msg = String("{Winding started at ") + timeStr + " and will wind your favorite Automatic Watch for next " + durationMinutes + " min, at " + String(rpm) + " RPM.}";
-    ntfy.send(msg);
+    char msgBuf[160];
+    snprintf(msgBuf, sizeof(msgBuf), "" NTFY_MSG_WINDING "", timeStr, durationMinutes, rpm);
+    ntfy.send(String(msgBuf));
 
     start(totalSteps, clockwise);
 }
@@ -84,8 +112,8 @@ void StepperMotorDriver::step(int steps, bool clockwise) {
     int direction = clockwise ? 1 : -1;
     for (int i = 0; i < abs(steps); i++) {
         _currentStep += direction;
-        if (_currentStep < 0) _currentStep = 7;
-        if (_currentStep > 7) _currentStep = 0;
+        if (_currentStep < 0) _currentStep = 3;
+        if (_currentStep > 3) _currentStep = 0;
         stepMotor(_currentStep);
         delayMicroseconds(_stepDelay);
     }
@@ -108,12 +136,13 @@ void StepperMotorDriver::release() {
 }
 
 // Map 5 speed levels to RPM for 28BYJ-48
+// Full-step mode - conservative speeds for reliability
 float StepperMotorDriver::speedStringToRPM(const String& speedStr) {
-    if (speedStr == "Very Slow") return 5.0;
+    if (speedStr == "Very Slow") return 8.0;
     if (speedStr == "Slow") return 10.0;
-    if (speedStr == "Medium") return 15.0;
-    if (speedStr == "Fast") return 20.0;
-    if (speedStr == "Very Fast") return 25.0;
+    if (speedStr == "Medium") return 12.0;
+    if (speedStr == "Fast") return 14.0;
+    if (speedStr == "Very Fast") return 16.0;
     // Default fallback
-    return 10.0;
+    return 12.0;
 }

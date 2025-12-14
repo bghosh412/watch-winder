@@ -9,6 +9,8 @@ platformio run --target clean
 
 platformio run --target uploadfs
 
+platformio run --target buildfs --environment d1mini
+
 reset ESP8266
 
 platformio run --target uploadfs
