@@ -485,6 +485,13 @@ void handleApiDoUpdate() {
   LittleFS.end();
   delay(100);
   
+  // Disable WiFi sleep for stable connection during OTA
+  Serial.println("[OTA] Disabling WiFi sleep mode...");
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
+  delay(100);
+  
+  Serial.printf("[OTA] WiFi RSSI: %d dBm\n", WiFi.RSSI());
+  
   // Update firmware (this will reboot automatically on success)
   Serial.println("[OTA] Starting firmware update...");
   bool fwOk = OtaUpdate::updateFirmware(OTA_BIN_URL);

@@ -63,11 +63,13 @@ public:
     static bool updateFirmware(const String& binUrl = OTA_BIN_URL) {
         Serial.printf("[OTA] Free heap before update: %u bytes\n", ESP.getFreeHeap());
         
-        // Use WiFiClientSecure with minimal settings for ESP8266
+        // Use WiFiClientSecure with absolute minimal settings
         WiFiClientSecure client;
         client.setInsecure();  // Bypass SSL certificate validation
-        client.setBufferSizes(512, 512);  // Minimal buffers
-        client.setTimeout(30000);  // 30 second timeout
+        //client.setBufferSizes(256, 512);  // Minimal RX buffer, standard TX
+        
+        // Disable session caching to save memory
+        //client.setSession(nullptr);
         
         ESPhttpUpdate.setLedPin(LED_BUILTIN, LOW);
         ESPhttpUpdate.rebootOnUpdate(true);
