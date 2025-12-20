@@ -312,6 +312,8 @@ void handleApiSchedulePost() {
       String out;
       serializeJson(doc, out);
       if (writeFile("/Config/schedule.txt", out)) {
+        // Update next winding time after saving schedule
+        updateNextWindingTime();
         server.send(200, "application/json", "{\"status\":\"ok\"}");
       } else {
         server.send(500, "application/json", "{\"status\":\"error\",\"error\":\"Failed to save\"}");
@@ -601,6 +603,10 @@ void loop() {
   if (nowMillis - lastScheduleCheck > checkInterval) {
     lastScheduleCheck = nowMillis;
     if (nextWindingEpoch > 0 && nowEpoch >= nextWindingEpoch && !scheduledWindingInProgress) {
+      // Calculate and update next winding time BEFORE starting
+      Serial.println("[SCHEDULE] Calculating next winding time before starting...");
+      updateNextWindingTime();
+      
       int duration;
       String speed;
       getWindingParams(duration, speed);
@@ -608,10 +614,6 @@ void loop() {
       Serial.printf("[SCHEDULE] Starting scheduled winding: %d min, %s (%.1f RPM)\n", duration, speed.c_str(), rpm);
       stepper.runForDuration((float)duration, rpm, true);
       scheduledWindingInProgress = true;
-      
-      // Update next winding time immediately after starting
-      Serial.println("[SCHEDULE] Updating next winding time...");
-      updateNextWindingTime();
     }
   }
   if (scheduledWindingInProgress && !stepper.isRunning()) {
