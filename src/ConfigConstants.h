@@ -2,7 +2,7 @@
 #define CONFIG_CONSTANTS_H
 
 // Firmware version (update this with each release)
-#define FIRMWARE_VERSION "1.0.8"
+#define FIRMWARE_VERSION "1.0.11"
 
 // OTA update URLs
 #define OTA_VERSION_URL "https://raw.githubusercontent.com/bghosh412/OTA/main/WW-OTA/version.txt"

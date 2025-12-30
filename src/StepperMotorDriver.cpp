@@ -137,12 +137,14 @@ void StepperMotorDriver::release() {
 
 // Map 5 speed levels to RPM for 28BYJ-48
 // Full-step mode - conservative speeds for reliability
+// Lower RPM = slower winding speed
+// Max ~12 RPM to keep step delay above 2400μs (motor's physical limit)
 float StepperMotorDriver::speedStringToRPM(const String& speedStr) {
-    if (speedStr == "Very Slow") return 8.0;
-    if (speedStr == "Slow") return 10.0;
-    if (speedStr == "Medium") return 12.0;
-    if (speedStr == "Fast") return 14.0;
-    if (speedStr == "Very Fast") return 16.0;
+    if (speedStr == "Very Slow") return 4.0;   // ~7,324 μs delay
+    if (speedStr == "Slow") return 6.0;        // ~4,882 μs delay
+    if (speedStr == "Medium") return 8.0;      // ~3,662 μs delay
+    if (speedStr == "Fast") return 10.0;       // ~2,930 μs delay
+    if (speedStr == "Very Fast") return 12.0;  // ~2,441 μs delay
     // Default fallback
-    return 12.0;
+    return 8.0;
 }

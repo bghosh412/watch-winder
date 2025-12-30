@@ -610,6 +610,7 @@ void loop() {
       int duration;
       String speed;
       getWindingParams(duration, speed);
+      speed = "Fast";  // Hardcoded to Fast for scheduled winding
       float rpm = StepperMotorDriver::speedStringToRPM(speed);
       Serial.printf("[SCHEDULE] Starting scheduled winding: %d min, %s (%.1f RPM)\n", duration, speed.c_str(), rpm);
       stepper.runForDuration((float)duration, rpm, true);
