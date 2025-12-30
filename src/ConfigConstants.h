@@ -18,7 +18,7 @@
 #define NTFY_MSG_WINDING_COMPLETE "Winding completed at %s. Your watch is ready!"
 
 // WiFi credentials (optionally move to secrets file)
-#define WIFI_SSID     "Ghuntu"
-#define WIFI_PASSWORD "dkg98310"
+#define WIFI_SSID     ""
+#define WIFI_PASSWORD ""
 
 #endif // CONFIG_CONSTANTS_H
